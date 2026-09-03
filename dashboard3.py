@@ -1,8 +1,9 @@
 import time
 import random
+
+import altair as alt
 import pandas as pd
 import streamlit as st
-import altair as alt
 from streamlit_autorefresh import st_autorefresh
 
 # ---------------------------------------------------------
@@ -91,7 +92,7 @@ CUSTOM_CSS = f"""
         gap: 0.3rem;
         padding: 0.25rem 0.6rem;
         border-radius: 999px;
-        background-color: rgba(207,185,145,0.1);
+        background-color: rgba(207, 185, 145, 0.1);
         border: 1px solid {BRAND_GOLD};
         font-size: 0.7rem;
         color: {BRAND_GOLD};
@@ -114,7 +115,7 @@ CUSTOM_CSS = f"""
         border-radius: 0.75rem;
         padding: 0.9rem 1rem;
         border: 1px solid #e0e0e0;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     }}
 
     .card-heading {{
@@ -136,7 +137,7 @@ CUSTOM_CSS = f"""
         border-radius: 0.75rem;
         padding: 0.75rem;
         border: 1px solid #e5e7eb;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
     }}
 
     /* Warning banner */
@@ -164,7 +165,7 @@ CUSTOM_CSS = f"""
         border-radius: 0.75rem;
         padding: 0.75rem 0.75rem 0.25rem 0.75rem;
         border: 1px solid #e0e0e0;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
     }}
 
     /* Make Streamlit's native divider subtle */
@@ -175,10 +176,11 @@ CUSTOM_CSS = f"""
     }}
 </style>
 """
+
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Multi-detector config
+# Multi-detector configuration
 # ---------------------------------------------------------
 NUM_DETECTORS = 3
 DETECTOR_IDS = [f"Detector {i}" for i in range(1, NUM_DETECTORS + 1)]
@@ -187,7 +189,9 @@ DETECTOR_IDS = [f"Detector {i}" for i in range(1, NUM_DETECTORS + 1)]
 # Initialization of session state
 # ---------------------------------------------------------
 if "detector_running" not in st.session_state:
-    st.session_state.detector_running = {det_id: False for det_id in DETECTOR_IDS}
+    st.session_state.detector_running = {
+        det_id: False for det_id in DETECTOR_IDS
+    }
 
 if "data" not in st.session_state:
     st.session_state.data = pd.DataFrame(
@@ -215,12 +219,12 @@ if "warning_active" not in st.session_state:
 if "warning_messages" not in st.session_state:
     st.session_state.warning_messages = []
 
-# reference start time for relative seconds
+# Reference start time for relative seconds.
 if "t0" not in st.session_state:
     st.session_state.t0 = None
 
 # ---------------------------------------------------------
-# Parameter ranges & warning rules
+# Parameter ranges and warning rules
 # ---------------------------------------------------------
 PARAMETERS = {
     "O2": {
@@ -260,19 +264,22 @@ PARAMETERS = {
     },
 }
 
-WARNING_PROB_PER_SECOND = 1.0 / 20.0  # ~1 event per 20 seconds
+WARNING_PROB_PER_SECOND = 1.0 / 20.0  # Approximately one event every 20 seconds.
 
 
 def should_inject_warning():
+    """Randomly decide whether to inject an abnormal sensor condition."""
     return random.random() < WARNING_PROB_PER_SECOND
 
 
 def generate_normal_value(param_key):
+    """Generate a simulated reading within the configured range."""
     cfg = PARAMETERS[param_key]
     return random.uniform(cfg["bot_min"], cfg["bot_max"])
 
 
 def generate_warning_value(param_key, current_value):
+    """Generate a value that crosses the configured warning threshold."""
     cfg = PARAMETERS[param_key]
     warn_low = cfg["warn_low"]
     warn_high = cfg["warn_high"]
@@ -291,49 +298,60 @@ def generate_warning_value(param_key, current_value):
 
     if direction == "low":
         return random.uniform(bot_min, warn_low - 0.5)
-    else:
-        return random.uniform(warn_high + 0.5, bot_max)
+
+    return random.uniform(warn_high + 0.5, bot_max)
 
 
 def evaluate_warnings(o2, co2, rh, voc):
+    """Evaluate readings against alert thresholds and return warning details."""
     msgs = []
 
-    o2_warn = (o2 < PARAMETERS["O2"]["warn_low"]) or (o2 > PARAMETERS["O2"]["warn_high"])
+    o2_warn = (
+        o2 < PARAMETERS["O2"]["warn_low"]
+        or o2 > PARAMETERS["O2"]["warn_high"]
+    )
     if o2_warn:
         msgs.append(
             f"O₂ outside safe range: {o2:.2f} {PARAMETERS['O2']['unit']} "
-            f"(safe {PARAMETERS['O2']['warn_low']:.1f}–{PARAMETERS['O2']['warn_high']:.1f} {PARAMETERS['O2']['unit']})"
+            f"(safe {PARAMETERS['O2']['warn_low']:.1f}–"
+            f"{PARAMETERS['O2']['warn_high']:.1f} {PARAMETERS['O2']['unit']})"
         )
 
     co2_warn = co2 > PARAMETERS["CO2"]["warn_high"]
     if co2_warn:
         msgs.append(
             f"CO₂ high: {co2:.0f} {PARAMETERS['CO2']['unit']} "
-            f"(warning > {PARAMETERS['CO2']['warn_high']:.0f} {PARAMETERS['CO2']['unit']})"
+            f"(warning > {PARAMETERS['CO2']['warn_high']:.0f} "
+            f"{PARAMETERS['CO2']['unit']})"
         )
 
     rh_warn = rh > PARAMETERS["RH"]["warn_high"]
     if rh_warn:
         msgs.append(
             f"RH high: {rh:.1f} {PARAMETERS['RH']['unit']} "
-            f"(warning > {PARAMETERS['RH']['warn_high']:.0f} {PARAMETERS['RH']['unit']})"
+            f"(warning > {PARAMETERS['RH']['warn_high']:.0f} "
+            f"{PARAMETERS['RH']['unit']})"
         )
 
     voc_warn = voc > PARAMETERS["VOC"]["warn_high"]
     if voc_warn:
         msgs.append(
             f"VOC high: {voc:.0f} {PARAMETERS['VOC']['unit']} "
-            f"(warning > {PARAMETERS['VOC']['warn_high']:.0f} {PARAMETERS['VOC']['unit']})"
+            f"(warning > {PARAMETERS['VOC']['warn_high']:.0f} "
+            f"{PARAMETERS['VOC']['unit']})"
         )
 
     any_warn = o2_warn or co2_warn or rh_warn or voc_warn
+
     return any_warn, o2_warn, co2_warn, rh_warn, voc_warn, msgs
 
 
 def multi_series_chart(df, field, title, y_title, palette):
     """
-    Multi-detector line chart on shared axes (color = detector_id),
-    x-axis is seconds since start (numeric).
+    Create a shared-axis, multi-detector line chart.
+
+    The x-axis is elapsed time in seconds. Each detector is represented
+    by a separate colored series.
     """
     return (
         alt.Chart(df)
@@ -351,13 +369,18 @@ def multi_series_chart(df, field, title, y_title, palette):
                 scale=alt.Scale(range=palette),
             ),
             tooltip=[
-                alt.Tooltip("seconds_since_start:Q", title="Time (s)", format=".0f"),
+                alt.Tooltip(
+                    "seconds_since_start:Q",
+                    title="Time (s)",
+                    format=".0f",
+                ),
                 alt.Tooltip("detector_id:N", title="Detector"),
                 alt.Tooltip(f"{field}:Q", title=y_title),
             ],
         )
         .properties(title=title, height=260)
     )
+
 
 # ---------------------------------------------------------
 # Branded header
@@ -372,6 +395,7 @@ st.markdown(
       Real-time simulation of O₂, N₂, CO₂, RH, and VOC conditions during food and nut shipments.
     </p>
   </div>
+
   <div class="app-header-right">
     <div class="app-header-pill">
       <span>●</span><span>Prototype dashboard</span>
@@ -385,29 +409,21 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
-# Detector placement visual
+# Controls and detector placement
 # ---------------------------------------------------------
 st.markdown(
-    '<div class="section-header">Detector placement inside shipment</div>',
+    '<div class="section-header">Configuration</div>',
     unsafe_allow_html=True,
 )
 
-# Replace this URL with the raw URL of your image in GitHub
-st.image(
-    "https://raw.githubusercontent.com/akashpatil8888/PurdueShipment/main/image.jpg",
-    caption="Approximate placement of the shipment atmosphere detectors.",
-    width="stretch",  # make image fill the container width
-)
-
-# ---------------------------------------------------------
-# Controls & context
-# ---------------------------------------------------------
-st.markdown('<div class="section-header">Configuration</div>', unsafe_allow_html=True)
-controls_col, status_col = st.columns([1.2, 1])
+controls_col, image_col = st.columns([1.2, 1])
 
 with controls_col:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-heading">Detector control</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="card-heading">Detector control</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         '<div class="card-label">Start or stop each simulated detector independently.</div>',
         unsafe_allow_html=True,
@@ -418,45 +434,65 @@ with controls_col:
         stop_key = f"stop_{det_id}"
 
         c1, c2, c3 = st.columns([1, 1, 1.2])
+
         with c1:
-            if st.button(f"▶ Start {det_id}", key=start_key, type="primary"):
+            if st.button(
+                f"▶ Start {det_id}",
+                key=start_key,
+                type="primary",
+            ):
                 st.session_state.detector_running[det_id] = True
+
                 if st.session_state.t0 is None:
                     st.session_state.t0 = pd.Timestamp.now()
+
         with c2:
             if st.button(f"⏹ Stop {det_id}", key=stop_key):
                 st.session_state.detector_running[det_id] = False
+
         with c3:
-            status = "🟢 RUNNING" if st.session_state.detector_running[det_id] else "⚪️ Idle"
+            status = (
+                "🟢 RUNNING"
+                if st.session_state.detector_running[det_id]
+                else "⚪️ Idle"
+            )
             st.write(f"{det_id}: {status}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-with status_col:
+with image_col:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-heading">Shipment context</div>', unsafe_allow_html=True)
     st.markdown(
-        """
-- Mode: simulation (bot-generated sensor data)  
-- Intended use: teaching & concept demonstration  
-- Example application: monitoring modified atmosphere for nut and food shipments  
-        """.strip(),
-        unsafe_allow_html=False,
+        '<div class="card-heading">Detector placement inside shipment</div>',
+        unsafe_allow_html=True,
     )
+
+    st.image(
+        "https://raw.githubusercontent.com/akashpatil8888/PurdueShipment/main/image.jpg",
+        caption="Approximate placement of the shipment atmosphere detectors.",
+        use_column_width=True,
+    )
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
 # Auto-refresh
 # ---------------------------------------------------------
 any_running = any(st.session_state.detector_running.values())
+
 if any_running:
-    st_autorefresh(interval=1000, limit=10**9, key="atmosphere_refresh")
+    st_autorefresh(
+        interval=1000,
+        limit=10**9,
+        key="atmosphere_refresh",
+    )
 
 # ---------------------------------------------------------
 # Data generation
 # ---------------------------------------------------------
 if any_running:
     ts = pd.Timestamp.now()
+
     if st.session_state.t0 is None:
         st.session_state.t0 = ts
 
@@ -479,19 +515,25 @@ if any_running:
                 ["O2", "CO2", "RH", "VOC"],
                 k=random.choice([1, 2]),
             )
-            for p in params_to_disturb:
-                if p == "O2":
+
+            for parameter in params_to_disturb:
+                if parameter == "O2":
                     o2 = generate_warning_value("O2", o2)
-                elif p == "CO2":
+                elif parameter == "CO2":
                     co2 = generate_warning_value("CO2", co2)
-                elif p == "RH":
+                elif parameter == "RH":
                     rh = generate_warning_value("RH", rh)
-                elif p == "VOC":
+                elif parameter == "VOC":
                     voc = generate_warning_value("VOC", voc)
 
-        any_warn, o2_warn, co2_warn, rh_warn, voc_warn, msgs = evaluate_warnings(
-            o2, co2, rh, voc
-        )
+        (
+            any_warn,
+            o2_warn,
+            co2_warn,
+            rh_warn,
+            voc_warn,
+            msgs,
+        ) = evaluate_warnings(o2, co2, rh, voc)
 
         new_rows.append(
             {
@@ -511,7 +553,7 @@ if any_running:
 
         if any_warn:
             any_warn_global = True
-            msgs_global.extend([f"{det_id}: {m}" for m in msgs])
+            msgs_global.extend([f"{det_id}: {message}" for message in msgs])
 
     if new_rows:
         st.session_state.data = pd.concat(
@@ -521,6 +563,7 @@ if any_running:
 
     st.session_state.warning_active = any_warn_global
     st.session_state.warning_messages = msgs_global
+
     if any_warn_global:
         st.session_state.last_warning_ts = ts
 
@@ -529,6 +572,7 @@ if any_running:
 # ---------------------------------------------------------
 if st.session_state.warning_active and st.session_state.warning_messages:
     specific_text = "; ".join(st.session_state.warning_messages)
+
     st.markdown(
         f"""
 <div class="warning-banner">
@@ -540,12 +584,16 @@ if st.session_state.warning_active and st.session_state.warning_messages:
     )
 
 # ---------------------------------------------------------
-# KPIs
+# Current readings
 # ---------------------------------------------------------
-st.markdown('<div class="section-header">Current readings</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-header">Current readings</div>',
+    unsafe_allow_html=True,
+)
 
 if not st.session_state.data.empty:
     latest_ts = st.session_state.data["timestamp"].max()
+
     latest_all = st.session_state.data[
         st.session_state.data["timestamp"] == latest_ts
     ]
@@ -554,34 +602,56 @@ if not st.session_state.data.empty:
 
     for det_col, det_id in zip(det_cols, DETECTOR_IDS):
         det_latest = latest_all[latest_all["detector_id"] == det_id]
+
         if det_latest.empty:
             continue
+
         latest = det_latest.iloc[-1]
 
         with det_col:
             st.markdown(f"**{det_id}**")
+
             st.metric(
                 label="Oxygen (O₂)",
-                value=f"{latest['O2_vol_pct']:.2f} {PARAMETERS['O2']['unit']}",
+                value=(
+                    f"{latest['O2_vol_pct']:.2f} "
+                    f"{PARAMETERS['O2']['unit']}"
+                ),
                 delta="WARNING" if latest["O2_warning"] else "",
             )
+
             st.metric(
                 label="Nitrogen (N₂)",
-                value=f"{latest['N2_vol_pct']:.2f} {PARAMETERS['N2']['unit']}",
+                value=(
+                    f"{latest['N2_vol_pct']:.2f} "
+                    f"{PARAMETERS['N2']['unit']}"
+                ),
             )
+
             st.metric(
                 label="Carbon dioxide (CO₂)",
-                value=f"{latest['CO2_ppm']:.0f} {PARAMETERS['CO2']['unit']}",
+                value=(
+                    f"{latest['CO2_ppm']:.0f} "
+                    f"{PARAMETERS['CO2']['unit']}"
+                ),
                 delta="HIGH" if latest["CO2_warning"] else "",
             )
+
             st.metric(
                 label="Relative humidity (RH)",
-                value=f"{latest['RH_pct']:.1f} {PARAMETERS['RH']['unit']}",
+                value=(
+                    f"{latest['RH_pct']:.1f} "
+                    f"{PARAMETERS['RH']['unit']}"
+                ),
                 delta="HIGH" if latest["RH_warning"] else "",
             )
+
             st.metric(
                 label="VOC",
-                value=f"{latest['VOC_ppm']:.0f} {PARAMETERS['VOC']['unit']}",
+                value=(
+                    f"{latest['VOC_ppm']:.0f} "
+                    f"{PARAMETERS['VOC']['unit']}"
+                ),
                 delta="HIGH" if latest["VOC_warning"] else "",
             )
 else:
@@ -590,25 +660,29 @@ else:
 # ---------------------------------------------------------
 # Live trends
 # ---------------------------------------------------------
-st.markdown('<div class="section-header">Live trends</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-header">Live trends</div>',
+    unsafe_allow_html=True,
+)
 
 if not st.session_state.data.empty and st.session_state.t0 is not None:
     df_plot = st.session_state.data.copy()
     df_plot["timestamp"] = pd.to_datetime(df_plot["timestamp"])
 
     df_plot["seconds_since_start"] = (
-        (df_plot["timestamp"] - st.session_state.t0).dt.total_seconds()
-    )
+        df_plot["timestamp"] - st.session_state.t0
+    ).dt.total_seconds()
 
-    # Palettes per parameter (3 detectors) using Purdue gold/gray/black
+    # Purdue gold, gray, and black provide one color per detector.
     o2_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
     n2_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
     co2_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
     voc_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
     rh_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
 
-    # Row 1: O2, N2
+    # Row 1: O₂ and N₂
     row1_col1, row1_col2 = st.columns(2)
+
     with row1_col1:
         chart_o2 = multi_series_chart(
             df_plot,
@@ -629,8 +703,9 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
         )
         st.altair_chart(chart_n2, use_container_width=True)
 
-    # Row 2: CO2, VOC
+    # Row 2: CO₂ and VOC
     row2_col1, row2_col2 = st.columns(2)
+
     with row2_col1:
         chart_co2 = multi_series_chart(
             df_plot,
@@ -651,26 +726,32 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
         )
         st.altair_chart(chart_voc, use_container_width=True)
 
-    # Row 3: RH + latest samples
+    # Row 3: RH trend and data log
     row3_col1, row3_col2 = st.columns([2, 1])
+
     with row3_col1:
         chart_rh = multi_series_chart(
             df_plot,
             "RH_pct",
             "Relative humidity (RH)",
-            "Relative Humidity (%RH)",
+            "Relative humidity (%RH)",
             rh_colors,
         )
         st.altair_chart(chart_rh, use_container_width=True)
 
     with row3_col2:
         st.markdown('<div class="table-card">', unsafe_allow_html=True)
-        st.markdown("**Data Log**", unsafe_allow_html=False)
+        st.markdown("**Data Log**")
+
         st.dataframe(
-            st.session_state.data.tail(30).set_index(["timestamp", "detector_id"]),
+            st.session_state.data.tail(30).set_index(
+                ["timestamp", "detector_id"]
+            ),
             use_container_width=True,
             height=320,
         )
+
         st.markdown("</div>", unsafe_allow_html=True)
+
 else:
     st.info("Waiting for data. Start any detector to populate the trend charts.")
