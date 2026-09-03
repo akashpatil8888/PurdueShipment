@@ -64,11 +64,12 @@ DETECTOR_IDS = [f"Detector {i}" for i in range(1, NUM_DETECTORS + 1)]
 # ---------------------------------------------------------
 # Initialization of session state
 # ---------------------------------------------------------
-if "running" not in st.session_state:
-    st.session_state.running = False
+if "detector_running" not in st.session_state:
+    # one running flag per detector
+    st.session_state.detector_running = {det_id: False for det_id in DETECTOR_IDS}
 
 if "data" not in st.session_state:
-    # One row per detector per timestamp
+    # one row per detector per timestamp
     st.session_state.data = pd.DataFrame(
         columns=[
             "timestamp",
@@ -219,7 +220,7 @@ def evaluate_warnings(o2, co2, rh, voc):
 
 def multi_series_chart(df, field, title, y_title, palette):
     """
-    Multi-detector line chart on shared axes (color = detector_id). [web:1]
+    Multi-detector line chart on shared axes (color = detector_id).
     """
     return (
         alt.Chart(df)
@@ -250,17 +251,22 @@ controls_col, status_col = st.columns([1, 2])
 
 with controls_col:
     st.markdown('<div class="section-header">Detector Control</div>', unsafe_allow_html=True)
-    start_btn = st.button("▶ Start Detector", type="primary")
-    stop_btn = st.button("⏹ Stop Tracking")
 
-    if start_btn:
-        st.session_state.running = True
-    if stop_btn:
-        st.session_state.running = False
-        st.session_state.warning_active = False
-        st.session_state.warning_messages = []
+    # One row of buttons per detector
+    for det_id in DETECTOR_IDS:
+        start_key = f"start_{det_id}"
+        stop_key = f"stop_{det_id}"
 
-    st.write("Status:", "🟢 RUNNING" if st.session_state.running else "⚪️ IDLE")
+        c1, c2, c3 = st.columns([1, 1, 1])
+        with c1:
+            if st.button(f"▶ Start {det_id}", key=start_key, type="primary"):
+                st.session_state.detector_running[det_id] = True
+        with c2:
+            if st.button(f"⏹ Stop {det_id}", key=stop_key):
+                st.session_state.detector_running[det_id] = False
+        with c3:
+            status = "🟢 RUNNING" if st.session_state.detector_running[det_id] else "⚪️ IDLE"
+            st.write(status)
 
 with status_col:
     st.markdown('<div class="section-header">Shipment Context</div>', unsafe_allow_html=True)
@@ -269,22 +275,26 @@ with status_col:
     st.write("• Sampling interval: 1 second (bot tick)")
 
 # ---------------------------------------------------------
-# Auto-refresh: keep app rerunning every 1s while running
+# Auto-refresh: keep app rerunning every 1s while any detector is running
 # ---------------------------------------------------------
-if st.session_state.running:
+any_running = any(st.session_state.detector_running.values())
+if any_running:
     st_autorefresh(interval=1000, limit=10**9, key="atmosphere_refresh")
 
 # ---------------------------------------------------------
-# Data generation tick – now for 3 detectors
+# Data generation tick – for all running detectors
 # Detector keeps tracking even during warnings
 # ---------------------------------------------------------
-if st.session_state.running:
+if any_running:
     ts = pd.Timestamp.now()
     new_rows = []
     any_warn_global = False
     msgs_global = []
 
     for det_id in DETECTOR_IDS:
+        if not st.session_state.detector_running[det_id]:
+            continue  # this detector is stopped
+
         # Generate base (normal) readings
         o2 = generate_normal_value("O2")
         n2 = generate_normal_value("N2")
@@ -292,7 +302,7 @@ if st.session_state.running:
         rh = generate_normal_value("RH")
         voc = generate_normal_value("VOC")
 
-        # Randomly inject a warning event (1–2 parameters disturbed) per detector
+        # Randomly inject a warning event (1–2 parameters disturbed)
         if should_inject_warning():
             params_to_disturb = random.sample(
                 ["O2", "CO2", "RH", "VOC"],
@@ -333,10 +343,11 @@ if st.session_state.running:
             any_warn_global = True
             msgs_global.extend([f"{det_id}: {m}" for m in msgs])
 
-    st.session_state.data = pd.concat(
-        [st.session_state.data, pd.DataFrame(new_rows)],
-        ignore_index=True,
-    )
+    if new_rows:
+        st.session_state.data = pd.concat(
+            [st.session_state.data, pd.DataFrame(new_rows)],
+            ignore_index=True,
+        )
 
     st.session_state.warning_active = any_warn_global
     st.session_state.warning_messages = msgs_global
@@ -478,4 +489,4 @@ if not st.session_state.data.empty:
             height=320,
         )
 else:
-    st.info("Detector is idle. Click 'Start Detector' to begin simulation.")
+    st.info("All detectors are idle. Click the start button for any detector to begin simulation.")
