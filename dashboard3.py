@@ -469,8 +469,8 @@ with image_col:
 
     st.image(
         "https://raw.githubusercontent.com/akashpatil8888/PurdueShipment/main/image.jpg",
-        caption="Approximate placement of the shipment atmosphere detectors.",
-        use_column_width=True,
+    caption="Approximate placement of the shipment atmosphere detectors.",
+    width="stretch",
     )
 
     st.markdown("</div>", unsafe_allow_html=True)
