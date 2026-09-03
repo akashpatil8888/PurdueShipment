@@ -2,6 +2,7 @@ import time
 import random
 import pandas as pd
 import streamlit as st
+import altair as alt
 
 # ---------------------------------------------------------
 # Configuration & styling
@@ -12,7 +13,6 @@ st.set_page_config(
     layout="wide",
 )
 
-# Inject a simple professional theme
 CUSTOM_CSS = """
 <style>
     .main {
@@ -115,7 +115,7 @@ PARAMETERS = {
         "warn_low": None,
         "warn_high": 70,
     },
-    # VOC ranges can be tuned as you like
+    # VOC ranges can be tuned as needed
     "VOC": {
         "unit": "ppm",
         "bot_min": 0,
@@ -125,9 +125,7 @@ PARAMETERS = {
     },
 }
 
-# Probability per second that we inject a warning event.
-# Roughly yields one warning every ~20 seconds on average,
-# but spacing is random.
+# Warning probability: ~1 event per 20 seconds, random spacing
 WARNING_PROB_PER_SECOND = 1.0 / 20.0
 
 
@@ -153,11 +151,10 @@ def generate_warning_value(param_key, current_value):
     bot_min = cfg["bot_min"]
     bot_max = cfg["bot_max"]
 
-    # If no warning rule, just return the current in-range value
     if warn_low is None and warn_high is None:
+        # No warning rule defined; keep value
         return current_value
 
-    # Decide randomly whether to go low or high if both exist
     if warn_low is not None and warn_high is not None:
         direction = random.choice(["low", "high"])
     elif warn_low is not None:
@@ -166,10 +163,8 @@ def generate_warning_value(param_key, current_value):
         direction = "high"
 
     if direction == "low":
-        # Push below lower warning threshold but within bot_min
         new_val = random.uniform(bot_min, warn_low - 0.5)
     else:
-        # Push above upper warning threshold but within bot_max
         new_val = random.uniform(warn_high + 0.5, bot_max)
 
     return new_val
@@ -181,19 +176,31 @@ def evaluate_warnings(o2, co2, rh, voc):
 
     o2_warn = (o2 < PARAMETERS["O2"]["warn_low"]) or (o2 > PARAMETERS["O2"]["warn_high"])
     if o2_warn:
-        msgs.append(f"O₂ outside safe range: {o2:.2f} {PARAMETERS['O2']['unit']}")
+        msgs.append(
+            f"O₂ outside safe range: {o2:.2f} {PARAMETERS['O2']['unit']} "
+            f"(safe {PARAMETERS['O2']['warn_low']:.1f}–{PARAMETERS['O2']['warn_high']:.1f} {PARAMETERS['O2']['unit']})"
+        )
 
     co2_warn = co2 > PARAMETERS["CO2"]["warn_high"]
     if co2_warn:
-        msgs.append(f"CO₂ high: {co2:.0f} {PARAMETERS['CO2']['unit']}")
+        msgs.append(
+            f"CO₂ high: {co2:.0f} {PARAMETERS['CO2']['unit']} "
+            f"(warning > {PARAMETERS['CO2']['warn_high']:.0f} {PARAMETERS['CO2']['unit']})"
+        )
 
     rh_warn = rh > PARAMETERS["RH"]["warn_high"]
     if rh_warn:
-        msgs.append(f"RH high: {rh:.1f} {PARAMETERS['RH']['unit']}")
+        msgs.append(
+            f"RH high: {rh:.1f} {PARAMETERS['RH']['unit']} "
+            f"(warning > {PARAMETERS['RH']['warn_high']:.0f} {PARAMETERS['RH']['unit']})"
+        )
 
     voc_warn = voc > PARAMETERS["VOC"]["warn_high"]
     if voc_warn:
-        msgs.append(f"VOC high: {voc:.0f} {PARAMETERS['VOC']['unit']}")
+        msgs.append(
+            f"VOC high: {voc:.0f} {PARAMETERS['VOC']['unit']} "
+            f"(warning > {PARAMETERS['VOC']['warn_high']:.0f} {PARAMETERS['VOC']['unit']})"
+        )
 
     any_warn = o2_warn or co2_warn or rh_warn or voc_warn
     return any_warn, o2_warn, co2_warn, rh_warn, voc_warn, msgs
@@ -228,10 +235,11 @@ with status_col:
     st.markdown('<div class="section-header">Shipment Context</div>', unsafe_allow_html=True)
     st.write("• Mode: Simulation (bot-generated data)")
     st.write("• Use case: Atmosphere monitoring for nut/food shipments")
-    st.write("• Sampling interval: 1 second")
+    st.write("• Sampling interval: 1 second (bot tick)")
 
 # ---------------------------------------------------------
 # Data generation loop (single tick per rerun)
+# Detector keeps tracking even during warnings
 # ---------------------------------------------------------
 if st.session_state.running:
     # Generate base (normal) readings
@@ -241,9 +249,8 @@ if st.session_state.running:
     rh = generate_normal_value("RH")
     voc = generate_normal_value("VOC")
 
-    # Decide whether to inject a warning event for this tick
+    # Randomly inject a warning event (1–2 parameters disturbed)
     if should_inject_warning():
-        # Randomly choose 1–2 parameters to disturb
         params_to_disturb = random.sample(
             ["O2", "CO2", "RH", "VOC"],
             k=random.choice([1, 2]),
@@ -258,6 +265,7 @@ if st.session_state.running:
             elif p == "VOC":
                 voc = generate_warning_value("VOC", voc)
 
+    # Evaluate warnings – detector continues tracking regardless
     any_warn, o2_warn, co2_warn, rh_warn, voc_warn, msgs = evaluate_warnings(
         o2, co2, rh, voc
     )
@@ -287,20 +295,18 @@ if st.session_state.running:
     if any_warn:
         st.session_state.last_warning_ts = ts
 
-    # Sleep a bit so the user sees the refresh; in production you might
-    # use streamlit-autorefresh or another pattern.
+    # 1-second tick for the bot
     time.sleep(1)
 
 # ---------------------------------------------------------
-# Warning banner
+# Warning banner – specific gas failures
 # ---------------------------------------------------------
 if st.session_state.warning_active and st.session_state.warning_messages:
+    specific_text = "; ".join(st.session_state.warning_messages)
     st.markdown(
-        '<div class="warning-banner">⚠ ATMOSPHERE ALERT – Operator Intervention Recommended</div>',
+        f'<div class="warning-banner">⚠ ATMOSPHERE ALERT – {specific_text}</div>',
         unsafe_allow_html=True,
     )
-    for m in st.session_state.warning_messages:
-        st.write("•", m)
 
 # ---------------------------------------------------------
 # KPIs row
@@ -341,28 +347,86 @@ if not st.session_state.data.empty:
         )
 
 # ---------------------------------------------------------
-# Time series charts
+# Time series charts with labeled axes
 # ---------------------------------------------------------
 st.markdown('<div class="section-header">Live Trends</div>', unsafe_allow_html=True)
 
 if not st.session_state.data.empty:
-    df_plot = st.session_state.data.set_index("timestamp")
+    df_plot = st.session_state.data.copy()
+    df_plot["timestamp"] = pd.to_datetime(df_plot["timestamp"])
 
+    # O2 & N2 (vol%)
     gas_col1, gas_col2 = st.columns(2)
 
     with gas_col1:
         st.subheader("O₂ and N₂ (vol%)")
-        st.line_chart(df_plot[["O2_vol_pct", "N2_vol_pct"]])
+        df_o2n2 = df_plot[["timestamp", "O2_vol_pct", "N2_vol_pct"]].melt(
+            "timestamp", var_name="parameter", value_name="value"
+        )
+        chart_o2n2 = (
+            alt.Chart(df_o2n2)
+            .mark_line()
+            .encode(
+                x=alt.X("timestamp:T", title="Time"),
+                y=alt.Y("value:Q", title="Concentration (vol%)"),
+                color=alt.Color(
+                    "parameter:N",
+                    title="Gas",
+                    scale=alt.Scale(
+                        domain=["O2_vol_pct", "N2_vol_pct"],
+                        range=["#22c55e", "#3b82f6"],
+                    ),
+                    legend=alt.Legend(labelExpr="datum.label.replace('_vol_pct','')"),
+                ),
+                tooltip=["timestamp:T", "parameter:N", "value:Q"],
+            )
+            .properties(height=250)
+        )
+        st.altair_chart(chart_o2n2, use_container_width=True)
 
+    # CO2 & VOC (ppm)
     with gas_col2:
-        st.subheader("CO₂ & VOC (ppm)")
-        st.line_chart(df_plot[["CO2_ppm", "VOC_ppm"]])
+        st.subheader("CO₂ and VOC (ppm)")
+        df_co2voc = df_plot[["timestamp", "CO2_ppm", "VOC_ppm"]].melt(
+            "timestamp", var_name="parameter", value_name="value"
+        )
+        chart_co2voc = (
+            alt.Chart(df_co2voc)
+            .mark_line()
+            .encode(
+                x=alt.X("timestamp:T", title="Time"),
+                y=alt.Y("value:Q", title="Concentration (ppm)"),
+                color=alt.Color(
+                    "parameter:N",
+                    title="Gas",
+                    scale=alt.Scale(
+                        domain=["CO2_ppm", "VOC_ppm"],
+                        range=["#f97316", "#a855f7"],
+                    ),
+                    legend=alt.Legend(labelExpr="datum.label.replace('_ppm','')"),
+                ),
+                tooltip=["timestamp:T", "parameter:N", "value:Q"],
+            )
+            .properties(height=250)
+        )
+        st.altair_chart(chart_co2voc, use_container_width=True)
 
+    # RH (%RH) + recent samples table
     rh_col1, rh_col2 = st.columns([2, 1])
 
     with rh_col1:
         st.subheader("Relative Humidity (%RH)")
-        st.line_chart(df_plot[["RH_pct"]])
+        chart_rh = (
+            alt.Chart(df_plot)
+            .mark_line(color="#38bdf8")
+            .encode(
+                x=alt.X("timestamp:T", title="Time"),
+                y=alt.Y("RH_pct:Q", title="Relative Humidity (%RH)"),
+                tooltip=["timestamp:T", "RH_pct:Q"],
+            )
+            .properties(height=250)
+        )
+        st.altair_chart(chart_rh, use_container_width=True)
 
     with rh_col2:
         st.subheader("Latest Samples")
