@@ -396,7 +396,7 @@ st.markdown(
 st.image(
     "https://raw.githubusercontent.com/akashpatil8888/PurdueShipment/main/image.jpg",
     caption="Approximate placement of the shipment atmosphere detectors.",
-    use_column_width=True,
+    width="stretch",  # make image fill the container width
 )
 
 # ---------------------------------------------------------
