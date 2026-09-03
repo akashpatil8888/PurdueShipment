@@ -650,7 +650,7 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
 
     with row3_col2:
         st.markdown('<div class="table-card">', unsafe_allow_html=True)
-        st.markdown("**Latest samples**", unsafe_allow_html=False)
+        st.markdown("**Data Log**", unsafe_allow_html=False)
         st.dataframe(
             st.session_state.data.tail(30).set_index(["timestamp", "detector_id"]),
             use_container_width=True,
