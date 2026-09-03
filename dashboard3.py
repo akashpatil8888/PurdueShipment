@@ -394,7 +394,7 @@ st.markdown(
 
 # Replace this URL with the raw URL of your image in GitHub
 st.image(
-    "https://github.com/USERNAME/REPO/raw/BRANCH/path/to/image.jpg",
+    "https://raw.githubusercontent.com/akashpatil8888/PurdueShipment/main/image.jpg",
     caption="Approximate placement of the shipment atmosphere detectors.",
     use_column_width=True,
 )
