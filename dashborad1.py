@@ -3,6 +3,7 @@ import random
 import pandas as pd
 import streamlit as st
 import altair as alt
+from streamlit_autorefresh import st_autorefresh
 
 # ---------------------------------------------------------
 # Configuration & styling
@@ -208,6 +209,20 @@ def evaluate_warnings(o2, co2, rh, voc):
     return any_warn, o2_warn, co2_warn, rh_warn, voc_warn, msgs
 
 
+def single_series_chart(df, field, title, y_title, color):
+    """Helper to build a single-series Altair chart with labeled axes."""
+    return (
+        alt.Chart(df)
+        .mark_line(color=color)
+        .encode(
+            x=alt.X("timestamp:T", title="Time"),
+            y=alt.Y(f"{field}:Q", title=y_title),
+            tooltip=["timestamp:T", f"{field}:Q"],
+        )
+        .properties(title=title, height=250)
+    )
+
+
 # ---------------------------------------------------------
 # Layout: header & controls
 # ---------------------------------------------------------
@@ -240,7 +255,14 @@ with status_col:
     st.write("• Sampling interval: 1 second (bot tick)")
 
 # ---------------------------------------------------------
-# Data generation loop (single tick per rerun)
+# Auto-refresh: keep app rerunning every 1s while running
+# ---------------------------------------------------------
+if st.session_state.running:
+    # This triggers a rerun every 1000 ms as long as the session is active.
+    st_autorefresh(interval=1000, limit=10**9, key="atmosphere_refresh")
+
+# ---------------------------------------------------------
+# Data generation tick
 # Detector keeps tracking even during warnings
 # ---------------------------------------------------------
 if st.session_state.running:
@@ -297,11 +319,8 @@ if st.session_state.running:
     if any_warn:
         st.session_state.last_warning_ts = ts
 
-    # 1-second tick for the bot
-    time.sleep(1)
-
 # ---------------------------------------------------------
-# Warning banner – specific gas failures
+# Warning banner – specific gas failures (does NOT stop data)
 # ---------------------------------------------------------
 if st.session_state.warning_active and st.session_state.warning_messages:
     specific_text = "; ".join(st.session_state.warning_messages)
@@ -349,7 +368,7 @@ if not st.session_state.data.empty:
         )
 
 # ---------------------------------------------------------
-# Time series charts with labeled axes
+# Time series charts – separate graphs for each parameter
 # ---------------------------------------------------------
 st.markdown('<div class="section-header">Live Trends</div>', unsafe_allow_html=True)
 
@@ -357,80 +376,63 @@ if not st.session_state.data.empty:
     df_plot = st.session_state.data.copy()
     df_plot["timestamp"] = pd.to_datetime(df_plot["timestamp"])
 
-    # O2 & N2 (vol%)
-    gas_col1, gas_col2 = st.columns(2)
-
-    with gas_col1:
-        st.subheader("O₂ and N₂ (vol%)")
-        df_o2n2 = df_plot[["timestamp", "O2_vol_pct", "N2_vol_pct"]].melt(
-            "timestamp", var_name="parameter", value_name="value"
+    # Row 1: O2, N2
+    row1_col1, row1_col2 = st.columns(2)
+    with row1_col1:
+        chart_o2 = single_series_chart(
+            df_plot,
+            "O2_vol_pct",
+            "Oxygen (O₂)",
+            "Concentration (vol%)",
+            "#22c55e",
         )
-        chart_o2n2 = (
-            alt.Chart(df_o2n2)
-            .mark_line()
-            .encode(
-                x=alt.X("timestamp:T", title="Time"),
-                y=alt.Y("value:Q", title="Concentration (vol%)"),
-                color=alt.Color(
-                    "parameter:N",
-                    title="Gas",
-                    scale=alt.Scale(
-                        domain=["O2_vol_pct", "N2_vol_pct"],
-                        range=["#22c55e", "#3b82f6"],
-                    ),
-                    legend=alt.Legend(labelExpr="datum.label.replace('_vol_pct','')"),
-                ),
-                tooltip=["timestamp:T", "parameter:N", "value:Q"],
-            )
-            .properties(height=250)
-        )
-        st.altair_chart(chart_o2n2, use_container_width=True)
+        st.altair_chart(chart_o2, use_container_width=True)
 
-    # CO2 & VOC (ppm)
-    with gas_col2:
-        st.subheader("CO₂ and VOC (ppm)")
-        df_co2voc = df_plot[["timestamp", "CO2_ppm", "VOC_ppm"]].melt(
-            "timestamp", var_name="parameter", value_name="value"
+    with row1_col2:
+        chart_n2 = single_series_chart(
+            df_plot,
+            "N2_vol_pct",
+            "Nitrogen (N₂)",
+            "Concentration (vol%)",
+            "#3b82f6",
         )
-        chart_co2voc = (
-            alt.Chart(df_co2voc)
-            .mark_line()
-            .encode(
-                x=alt.X("timestamp:T", title="Time"),
-                y=alt.Y("value:Q", title="Concentration (ppm)"),
-                color=alt.Color(
-                    "parameter:N",
-                    title="Gas",
-                    scale=alt.Scale(
-                        domain=["CO2_ppm", "VOC_ppm"],
-                        range=["#f97316", "#a855f7"],
-                    ),
-                    legend=alt.Legend(labelExpr="datum.label.replace('_ppm','')"),
-                ),
-                tooltip=["timestamp:T", "parameter:N", "value:Q"],
-            )
-            .properties(height=250)
+        st.altair_chart(chart_n2, use_container_width=True)
+
+    # Row 2: CO2, VOC
+    row2_col1, row2_col2 = st.columns(2)
+    with row2_col1:
+        chart_co2 = single_series_chart(
+            df_plot,
+            "CO2_ppm",
+            "Carbon dioxide (CO₂)",
+            "Concentration (ppm)",
+            "#f97316",
         )
-        st.altair_chart(chart_co2voc, use_container_width=True)
+        st.altair_chart(chart_co2, use_container_width=True)
 
-    # RH (%RH) + recent samples table
-    rh_col1, rh_col2 = st.columns([2, 1])
+    with row2_col2:
+        chart_voc = single_series_chart(
+            df_plot,
+            "VOC_ppm",
+            "VOC",
+            "Concentration (ppm)",
+            "#a855f7",
+        )
+        st.altair_chart(chart_voc, use_container_width=True)
 
-    with rh_col1:
-        st.subheader("Relative Humidity (%RH)")
-        chart_rh = (
-            alt.Chart(df_plot)
-            .mark_line(color="#38bdf8")
-            .encode(
-                x=alt.X("timestamp:T", title="Time"),
-                y=alt.Y("RH_pct:Q", title="Relative Humidity (%RH)"),
-                tooltip=["timestamp:T", "RH_pct:Q"],
-            )
-            .properties(height=250)
+    # Row 3: RH + recent samples
+    row3_col1, row3_col2 = st.columns([2, 1])
+    with row3_col1:
+        chart_rh = single_series_chart(
+            df_plot,
+            "RH_pct",
+            "Relative humidity (RH)",
+            "Relative Humidity (%RH)",
+            "#38bdf8",
         )
         st.altair_chart(chart_rh, use_container_width=True)
 
-    with rh_col2:
+    with row3_col2:
         st.subheader("Latest Samples")
         st.dataframe(
             st.session_state.data.tail(20).set_index("timestamp"),
