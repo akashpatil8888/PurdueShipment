@@ -95,6 +95,10 @@ if "warning_active" not in st.session_state:
 if "warning_messages" not in st.session_state:
     st.session_state.warning_messages = []
 
+# store the reference start time for relative seconds
+if "t0" not in st.session_state:
+    st.session_state.t0 = None
+
 # ---------------------------------------------------------
 # Parameter ranges & warning rules
 # ---------------------------------------------------------
@@ -220,20 +224,29 @@ def evaluate_warnings(o2, co2, rh, voc):
 
 def multi_series_chart(df, field, title, y_title, palette):
     """
-    Multi-detector line chart on shared axes (color = detector_id).
+    Multi-detector line chart on shared axes (color = detector_id),
+    x-axis is seconds since start (numeric).
     """
     return (
         alt.Chart(df)
         .mark_line()
         .encode(
-            x=alt.X("timestamp:T", title="Time"),
+            x=alt.X(
+                "seconds_since_start:Q",
+                title="Time since start (s)",
+                axis=alt.Axis(format=".0f"),
+            ),
             y=alt.Y(f"{field}:Q", title=y_title),
             color=alt.Color(
                 "detector_id:N",
                 title="Detector",
                 scale=alt.Scale(range=palette),
             ),
-            tooltip=["timestamp:T", "detector_id:N", f"{field}:Q"],
+            tooltip=[
+                "seconds_since_start:Q",
+                "detector_id:N",
+                f"{field}:Q",
+            ],
         )
         .properties(title=title, height=250)
     )
@@ -261,6 +274,9 @@ with controls_col:
         with c1:
             if st.button(f"▶ Start {det_id}", key=start_key, type="primary"):
                 st.session_state.detector_running[det_id] = True
+                # set t0 on first start if not set
+                if st.session_state.t0 is None:
+                    st.session_state.t0 = pd.Timestamp.now()
         with c2:
             if st.button(f"⏹ Stop {det_id}", key=stop_key):
                 st.session_state.detector_running[det_id] = False
@@ -287,6 +303,10 @@ if any_running:
 # ---------------------------------------------------------
 if any_running:
     ts = pd.Timestamp.now()
+    # ensure t0 is set if user started detectors before this tick
+    if st.session_state.t0 is None:
+        st.session_state.t0 = ts
+
     new_rows = []
     any_warn_global = False
     msgs_global = []
@@ -410,13 +430,18 @@ if not st.session_state.data.empty:
 
 # ---------------------------------------------------------
 # Time series charts – separate graphs per parameter,
-# multiple detectors overlaid per graph
+# multiple detectors overlaid per graph (x = seconds since start)
 # ---------------------------------------------------------
 st.markdown('<div class="section-header">Live Trends</div>', unsafe_allow_html=True)
 
-if not st.session_state.data.empty:
+if not st.session_state.data.empty and st.session_state.t0 is not None:
     df_plot = st.session_state.data.copy()
     df_plot["timestamp"] = pd.to_datetime(df_plot["timestamp"])
+
+    # compute seconds since start as a float column
+    df_plot["seconds_since_start"] = (
+        (df_plot["timestamp"] - st.session_state.t0).dt.total_seconds()
+    )
 
     # Color palettes per parameter (3 detectors)
     o2_colors = ["#22c55e", "#4ade80", "#16a34a"]
