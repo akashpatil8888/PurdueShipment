@@ -18,7 +18,7 @@ st.set_page_config(
 # Purdue brand-inspired styling
 # ---------------------------------------------------------
 # Primary: Boilermaker Gold #CFB991, Black #000000
-# Supporting grays from brand guidelines.[web:51][web:59][web:62][web:60]
+# Supporting grays from brand guidelines.
 BRAND_GOLD = "#CFB991"
 BRAND_BLACK = "#000000"
 BRAND_DARK_GRAY = "#373A36"
@@ -382,6 +382,21 @@ st.markdown(
 </div>
 """,
     unsafe_allow_html=True,
+)
+
+# ---------------------------------------------------------
+# Detector placement visual
+# ---------------------------------------------------------
+st.markdown(
+    '<div class="section-header">Detector placement inside shipment</div>',
+    unsafe_allow_html=True,
+)
+
+# Replace this URL with the raw URL of your image in GitHub
+st.image(
+    "https://github.com/USERNAME/REPO/raw/BRANCH/path/to/image.jpg",
+    caption="Approximate placement of the shipment atmosphere detectors.",
+    use_column_width=True,
 )
 
 # ---------------------------------------------------------
