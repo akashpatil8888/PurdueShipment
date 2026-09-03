@@ -16,15 +16,17 @@ st.set_page_config(
 CUSTOM_CSS = """
 <style>
     .main {
-        background-color: #0f172a; /* dark slate */
-        color: #e5e7eb;           /* light gray */
+        background-color: #0f172a; /* dark slate background */
+        color: #e5e7eb;           /* light text for general content */
         font-family: "Segoe UI", Roboto, sans-serif;
     }
+    /* KPI metric cards: grey background, black text */
     .stMetric {
-        background-color: #111827;
+        background-color: #e5e7eb;  /* light grey card background */
+        color: #111827;             /* dark text inside the card */
         border-radius: 0.5rem;
         padding: 0.75rem;
-        box-shadow: 0 0 10px rgba(15,23,42,0.7);
+        box-shadow: 0 0 10px rgba(15,23,42,0.3);
     }
     .warning-banner {
         padding: 0.75rem 1rem;
@@ -309,7 +311,7 @@ if st.session_state.warning_active and st.session_state.warning_messages:
     )
 
 # ---------------------------------------------------------
-# KPIs row
+# KPIs row (grey cards, black text via CSS)
 # ---------------------------------------------------------
 if not st.session_state.data.empty:
     latest = st.session_state.data.iloc[-1]
