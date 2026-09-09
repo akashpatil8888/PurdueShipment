@@ -16,23 +16,36 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# Purdue brand-inspired styling
+# Purdue + techno styling
 # ---------------------------------------------------------
-# Primary: Boilermaker Gold #CFB991, Black #000000
-# Supporting grays from brand guidelines.
+# Primary: Boilermaker Gold #CFB991, techno dark background, neon accents.
 BRAND_GOLD = "#CFB991"
-BRAND_BLACK = "#000000"
-BRAND_DARK_GRAY = "#373A36"
+BRAND_BLACK = "#050816"      # deep dark background
+BRAND_DARK_GRAY = "#E5E7EB"  # light text on dark
 BRAND_GRAY = "#9D9795"
-BRAND_STEEL = "#555960"
+BRAND_STEEL = "#6B7280"
 
 CUSTOM_CSS = f"""
 <style>
-    /* Overall background and typography */
-    .main {{
-        background-color: #f5f5f5;
+    /* Global app background + typography */
+    html, body, .main {{
+        background: radial-gradient(circle at top, #0f172a 0%, #020617 45%, #000000 100%);
         color: {BRAND_DARK_GRAY};
         font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }}
+
+    /* Subtle techno grid overlay */
+    .main::before {{
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: 
+            linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+        background-size: 24px 24px;
+        mix-blend-mode: soft-light;
+        z-index: -1;
     }}
 
     .block-container {{
@@ -41,18 +54,40 @@ CUSTOM_CSS = f"""
         max-width: 1200px;
     }}
 
-    /* Branded header bar */
+    /* Techno header bar */
     .app-header {{
-        border-radius: 0.75rem;
+        border-radius: 1rem;
         padding: 1.25rem 1.5rem;
-        background: linear-gradient(120deg, {BRAND_BLACK}, #1f2933);
-        color: #ffffff;
-        border: 2px solid {BRAND_GOLD};
+        background: linear-gradient(135deg, #020617 0%, #0f172a 40%, #1e293b 100%);
+        color: #f9fafb;
+        border: 1px solid rgba(148, 163, 184, 0.45);
+        box-shadow:
+            0 0 0 1px rgba(15, 23, 42, 0.9),
+            0 25px 60px rgba(15, 23, 42, 0.9);
         display: flex;
         flex-direction: row;
         justify-content: space-between;
         align-items: center;
         gap: 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }}
+
+    /* Diagonal light sweep */
+    .app-header::after {{
+        content: "";
+        position: absolute;
+        inset: -40%;
+        background: radial-gradient(circle at 0% 0%, rgba(34, 211, 238, 0.18), transparent 60%);
+        mix-blend-mode: screen;
+        pointer-events: none;
+        animation: headerSweep 12s linear infinite;
+    }}
+
+    @keyframes headerSweep {{
+        0% {{ transform: translateX(-20%) translateY(-10%) rotate(15deg); }}
+        50% {{ transform: translateX(40%) translateY(20%) rotate(15deg); }}
+        100% {{ transform: translateX(110%) translateY(-10%) rotate(15deg); }}
     }}
 
     .app-header-left {{
@@ -66,118 +101,231 @@ CUSTOM_CSS = f"""
         letter-spacing: 0.15em;
         font-size: 0.65rem;
         color: {BRAND_GOLD};
+        opacity: 0.9;
     }}
 
     .app-title {{
-        font-size: 1.4rem;
-        font-weight: 600;
+        font-size: 1.6rem;
+        font-weight: 650;
         margin: 0;
+        letter-spacing: 0.03em;
     }}
 
     .app-subtitle {{
-        font-size: 0.9rem;
-        color: #e5e7eb;
+        font-size: 0.88rem;
+        color: #cbd5f5;
         margin: 0;
+        max-width: 36rem;
     }}
 
     .app-header-right {{
         text-align: right;
         font-size: 0.8rem;
-        color: #e5e7eb;
+        color: #cbd5f5;
     }}
 
     .app-header-pill {{
         display: inline-flex;
         align-items: center;
-        gap: 0.3rem;
-        padding: 0.25rem 0.6rem;
+        gap: 0.35rem;
+        padding: 0.4rem 0.8rem;
         border-radius: 999px;
-        background-color: rgba(207, 185, 145, 0.1);
-        border: 1px solid {BRAND_GOLD};
-        font-size: 0.7rem;
-        color: {BRAND_GOLD};
-        margin-bottom: 0.3rem;
+        background: radial-gradient(circle at 0% 0%, rgba(34, 211, 238, 0.25), transparent 60%);
+        border: 1px solid rgba(34, 211, 238, 0.6);
+        font-size: 0.72rem;
+        color: #e0f2fe;
+        margin-bottom: 0.45rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+    }}
+
+    .app-header-pill span:first-child {{
+        display: inline-block;
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        background: radial-gradient(circle at 30% 30%, #22c55e 0%, #16a34a 40%, #0f766e 100%);
+        box-shadow: 0 0 12px rgba(34, 197, 94, 0.85);
+        animation: pulseDot 1.8s ease-in-out infinite;
+    }}
+
+    @keyframes pulseDot {{
+        0%, 100% {{ transform: scale(1); opacity: 1; }}
+        50% {{ transform: scale(1.3); opacity: 0.75; }}
     }}
 
     /* Section labels */
     .section-header {{
         font-size: 0.8rem;
         font-weight: 600;
-        letter-spacing: 0.15em;
+        letter-spacing: 0.22em;
         text-transform: uppercase;
-        color: {BRAND_GRAY};
-        margin: 1.25rem 0 0.5rem 0;
+        color: #9ca3af;
+        margin: 1.4rem 0 0.75rem 0;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
     }}
 
-    /* Neat cards for controls, context, KPIs */
-    .card {{
-        background-color: #ffffff;
-        border-radius: 0.75rem;
+    .section-header::before {{
+        content: "";
+        width: 16px;
+        height: 2px;
+        background: linear-gradient(90deg, #22d3ee, #a855f7, #facc15);
+        border-radius: 999px;
+    }}
+
+    /* Cards: glassy, glowing edges */
+    .card, .table-card {{
+        background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.9), rgba(3, 7, 18, 0.95));
+        border-radius: 0.9rem;
         padding: 0.9rem 1rem;
-        border: 1px solid #e0e0e0;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        border: 1px solid rgba(148, 163, 184, 0.55);
+        box-shadow:
+            0 0 0 1px rgba(15, 23, 42, 0.8),
+            0 20px 45px rgba(15, 23, 42, 0.9);
+        backdrop-filter: blur(20px);
+    }}
+
+    .table-card {{
+        padding: 0.85rem 0.85rem 0.3rem 0.85rem;
     }}
 
     .card-heading {{
         font-size: 0.9rem;
         font-weight: 600;
         margin-bottom: 0.4rem;
-        color: {BRAND_DARK_GRAY};
+        color: #e5e7eb;
     }}
 
     .card-label {{
         font-size: 0.8rem;
-        color: {BRAND_GRAY};
+        color: #9ca3af;
     }}
 
-    /* KPI metric cards */
+    /* Metric tiles (st.metric wrapper) */
     .stMetric {{
-        background-color: #ffffff;
-        color: {BRAND_DARK_GRAY};
-        border-radius: 0.75rem;
+        background: radial-gradient(circle at top, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.98));
+        color: #e5e7eb;
+        border-radius: 0.85rem;
         padding: 0.75rem;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+        border: 1px solid rgba(148, 163, 184, 0.65);
+        box-shadow:
+            0 0 0 1px rgba(15, 23, 42, 0.7),
+            0 18px 40px rgba(15, 23, 42, 0.9);
     }}
 
-    /* Warning banner */
+    /* Some Streamlit text classes (may change across versions) */
+    .st-emotion-cache-12w0qpk, .st-emotion-cache-1wivap2 {{
+        color: #e5e7eb !important;
+    }}
+
+    /* Button styling: more techno */
+    .stButton > button {{
+        background: linear-gradient(120deg, #22d3ee, #a855f7);
+        color: #0b1120;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.6);
+        padding: 0.35rem 0.9rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        box-shadow: 0 10px 25px rgba(56, 189, 248, 0.45);
+        transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, filter 0.08s ease-out;
+    }}
+
+    .stButton > button:hover {{
+        transform: translateY(-1px);
+        filter: brightness(1.08);
+        box-shadow: 0 16px 32px rgba(129, 140, 248, 0.65);
+    }}
+
+    .stButton > button:active {{
+        transform: translateY(0px) scale(0.98);
+        box-shadow: 0 10px 24px rgba(56, 189, 248, 0.5);
+    }}
+
+    /* Warning banner: animated alert strip */
     .warning-banner {{
         padding: 0.75rem 1rem;
-        border-radius: 0.75rem;
-        background: linear-gradient(90deg, #7f1d1d, #b91c1c);
-        color: #fef2f2;
+        border-radius: 0.85rem;
+        background: linear-gradient(90deg, #7f1d1d, #b91c1c, #7f1d1d);
+        background-size: 200% 200%;
+        color: #fee2e2;
         font-weight: 500;
         border: 1px solid #fecaca;
         margin-top: 1rem;
         margin-bottom: 0.75rem;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.6rem;
+        box-shadow:
+            0 0 0 1px rgba(127, 29, 29, 0.7),
+            0 16px 36px rgba(127, 29, 29, 0.75);
+        animation: warningShift 6s linear infinite;
+    }}
+
+    @keyframes warningShift {{
+        0% {{ background-position: 0% 50%; }}
+        50% {{ background-position: 100% 50%; }}
+        100% {{ background-position: 0% 50%; }}
     }}
 
     .warning-icon {{
-        font-size: 1.2rem;
+        font-size: 1.25rem;
+        filter: drop-shadow(0 0 8px rgba(248, 113, 113, 0.9));
     }}
 
-    /* Latest samples table wrapper */
-    .table-card {{
-        background-color: #ffffff;
-        border-radius: 0.75rem;
-        padding: 0.75rem 0.75rem 0.25rem 0.75rem;
-        border: 1px solid #e0e0e0;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
-    }}
-
-    /* Make Streamlit's native divider subtle */
+    /* Divider styling */
     hr {{
         border: none;
-        border-top: 1px solid #e0e0e0;
-        margin: 1.5rem 0 0.75rem 0;
+        border-top: 1px solid rgba(148, 163, 184, 0.45);
+        margin: 1.5rem 0 0.8rem 0;
+    }}
+
+    /* Dataframe tweaks for dark theme */
+    .table-card .stDataFrame, .table-card [data-testid="stTable"] {{
+        color: #e5e7eb;
+    }}
+
+    .table-card thead tr th, .table-card tbody tr td {{
+        background-color: rgba(15, 23, 42, 0.9) !important;
+        border-color: rgba(55, 65, 81, 0.6) !important;
     }}
 </style>
 """
 
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# Altair techno theme
+# ---------------------------------------------------------
+def shipment_techno_theme():
+    return {
+        "config": {
+            "background": "rgba(10, 16, 28, 0.0)",
+            "view": {"strokeWidth": 0},
+            "axis": {
+                "labelColor": "#e5e7eb",
+                "titleColor": "#9ca3af",
+                "gridColor": "rgba(148, 163, 184, 0.25)",
+                "domainColor": "rgba(148, 163, 184, 0.5)",
+            },
+            "legend": {
+                "labelColor": "#e5e7eb",
+                "titleColor": "#9ca3af",
+            },
+            "title": {
+                "color": "#e5e7eb",
+                "fontSize": 12,
+            },
+        }
+    }
+
+alt.themes.register("shipment_techno", shipment_techno_theme)
+alt.themes.enable("shipment_techno")
 
 # ---------------------------------------------------------
 # Multi-detector configuration
@@ -355,7 +503,7 @@ def multi_series_chart(df, field, title, y_title, palette):
     """
     return (
         alt.Chart(df)
-        .mark_line(point=False)
+        .mark_line(point=False, strokeWidth=2)
         .encode(
             x=alt.X(
                 "seconds_since_start:Q",
@@ -378,7 +526,7 @@ def multi_series_chart(df, field, title, y_title, palette):
                 alt.Tooltip(f"{field}:Q", title=y_title),
             ],
         )
-        .properties(title=title, height=260)
+        .properties(title=title, height=280)
     )
 
 
@@ -386,7 +534,7 @@ def multi_series_chart(df, field, title, y_title, palette):
 # Branded header
 # ---------------------------------------------------------
 st.markdown(
-    f"""
+    """
 <div class="app-header">
   <div class="app-header-left">
     <div class="app-eyebrow">Purdue University · Department of Food Science</div>
@@ -398,10 +546,10 @@ st.markdown(
 
   <div class="app-header-right">
     <div class="app-header-pill">
-      <span>●</span><span>Prototype dashboard</span>
+      <span></span><span>Real-time prototype</span>
     </div>
-    <div>Sampling interval: 1 second (simulated)</div>
-    <div>Detectors: 3 virtual sensors</div>
+    <div>Sampling interval: 1 s · virtual stream</div>
+    <div>Detectors online: 3 virtual nodes</div>
   </div>
 </div>
 """,
@@ -452,9 +600,9 @@ with controls_col:
 
         with c3:
             status = (
-                "🟢 RUNNING"
+                "🟢 ACTIVE"
                 if st.session_state.detector_running[det_id]
-                else "⚪️ Idle"
+                else "⚪️ STANDBY"
             )
             st.write(f"{det_id}: {status}")
 
@@ -469,8 +617,8 @@ with image_col:
 
     st.image(
         "https://raw.githubusercontent.com/akashpatil8888/PurdueShipment/main/image.jpg",
-    caption="Approximate placement of the shipment atmosphere detectors.",
-    width="stretch",
+        caption="Approximate placement of the shipment atmosphere detectors.",
+        use_container_width=True,
     )
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -655,7 +803,7 @@ if not st.session_state.data.empty:
                 delta="HIGH" if latest["VOC_warning"] else "",
             )
 else:
-    st.info("All detectors are idle. Start any detector to begin the simulation.")
+    st.info("All detectors are in STANDBY. Start any detector to begin the simulation.")
 
 # ---------------------------------------------------------
 # Live trends
@@ -673,12 +821,12 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
         df_plot["timestamp"] - st.session_state.t0
     ).dt.total_seconds()
 
-    # Purdue gold, gray, and black provide one color per detector.
-    o2_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
-    n2_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
-    co2_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
-    voc_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
-    rh_colors = [BRAND_GOLD, BRAND_STEEL, BRAND_BLACK]
+    # Neon palettes per detector
+    o2_colors = ["#22d3ee", "#a855f7", "#facc15"]
+    n2_colors = ["#22d3ee", "#a855f7", "#facc15"]
+    co2_colors = ["#22d3ee", "#a855f7", "#f97316"]
+    voc_colors = ["#22d3ee", "#a855f7", "#22c55e"]
+    rh_colors = ["#22d3ee", "#a855f7", "#38bdf8"]
 
     # Row 1: O₂ and N₂
     row1_col1, row1_col2 = st.columns(2)
@@ -691,7 +839,7 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
             "Concentration (vol%)",
             o2_colors,
         )
-        st.altair_chart(chart_o2, use_container_width=True)
+        st.altair_chart(chart_o2, use_container_width=True, theme=None)
 
     with row1_col2:
         chart_n2 = multi_series_chart(
@@ -701,7 +849,7 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
             "Concentration (vol%)",
             n2_colors,
         )
-        st.altair_chart(chart_n2, use_container_width=True)
+        st.altair_chart(chart_n2, use_container_width=True, theme=None)
 
     # Row 2: CO₂ and VOC
     row2_col1, row2_col2 = st.columns(2)
@@ -714,7 +862,7 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
             "Concentration (ppm)",
             co2_colors,
         )
-        st.altair_chart(chart_co2, use_container_width=True)
+        st.altair_chart(chart_co2, use_container_width=True, theme=None)
 
     with row2_col2:
         chart_voc = multi_series_chart(
@@ -724,7 +872,7 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
             "Concentration (ppm)",
             voc_colors,
         )
-        st.altair_chart(chart_voc, use_container_width=True)
+        st.altair_chart(chart_voc, use_container_width=True, theme=None)
 
     # Row 3: RH trend and data log
     row3_col1, row3_col2 = st.columns([2, 1])
@@ -737,7 +885,7 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
             "Relative humidity (%RH)",
             rh_colors,
         )
-        st.altair_chart(chart_rh, use_container_width=True)
+        st.altair_chart(chart_rh, use_container_width=True, theme=None)
 
     with row3_col2:
         st.markdown('<div class="table-card">', unsafe_allow_html=True)
