@@ -18,7 +18,6 @@ st.set_page_config(
 # ---------------------------------------------------------
 # Purdue + techno styling
 # ---------------------------------------------------------
-# Primary: Boilermaker Gold #CFB991, techno dark background, neon accents.
 BRAND_GOLD = "#CFB991"
 BRAND_BLACK = "#050816"      # deep dark background
 BRAND_DARK_GRAY = "#E5E7EB"  # light text on dark
@@ -300,6 +299,46 @@ CUSTOM_CSS = f"""
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
+# Multi-detector configuration
+# ---------------------------------------------------------
+NUM_DETECTORS = 3
+DETECTOR_IDS = [f"Detector {i}" for i in range(1, NUM_DETECTORS + 1)]
+
+# ---------------------------------------------------------
+# Sidebar controls
+# ---------------------------------------------------------
+with st.sidebar:
+    st.title("Simulation controls")
+    st.markdown("Adjust atmosphere simulation parameters and view filters.")
+
+    events_per_minute = st.slider(
+        "Warning events per minute (approx.)",
+        min_value=1,
+        max_value=6,
+        value=3,
+        help="Controls how often abnormal sensor conditions are injected."
+    )
+
+    sampling_interval_ms = st.slider(
+        "Sampling interval (ms)",
+        min_value=500,
+        max_value=3000,
+        value=1000,
+        step=250,
+        help="Controls how often new readings are simulated."
+    )
+
+    selected_detectors = st.multiselect(
+        "Detectors to display",
+        options=DETECTOR_IDS,
+        default=DETECTOR_IDS,
+    )
+
+    st.markdown("---")
+    start_all = st.button("▶ Start all detectors")
+    stop_all = st.button("⏹ Stop all detectors")
+
+# ---------------------------------------------------------
 # Altair techno theme
 # ---------------------------------------------------------
 def shipment_techno_theme():
@@ -321,17 +360,12 @@ def shipment_techno_theme():
                 "color": "#e5e7eb",
                 "fontSize": 12,
             },
+            "line": {"strokeWidth": 2},
         }
     }
 
 alt.themes.register("shipment_techno", shipment_techno_theme)
 alt.themes.enable("shipment_techno")
-
-# ---------------------------------------------------------
-# Multi-detector configuration
-# ---------------------------------------------------------
-NUM_DETECTORS = 3
-DETECTOR_IDS = [f"Detector {i}" for i in range(1, NUM_DETECTORS + 1)]
 
 # ---------------------------------------------------------
 # Initialization of session state
@@ -370,6 +404,17 @@ if "warning_messages" not in st.session_state:
 # Reference start time for relative seconds.
 if "t0" not in st.session_state:
     st.session_state.t0 = None
+
+# Honor sidebar global controls
+if start_all:
+    for det_id in DETECTOR_IDS:
+        st.session_state.detector_running[det_id] = True
+    if st.session_state.t0 is None:
+        st.session_state.t0 = pd.Timestamp.now()
+
+if stop_all:
+    for det_id in DETECTOR_IDS:
+        st.session_state.detector_running[det_id] = False
 
 # ---------------------------------------------------------
 # Parameter ranges and warning rules
@@ -412,7 +457,8 @@ PARAMETERS = {
     },
 }
 
-WARNING_PROB_PER_SECOND = 1.0 / 20.0  # Approximately one event every 20 seconds.
+# Use sidebar slider to control warning frequency
+WARNING_PROB_PER_SECOND = events_per_minute / 60.0
 
 
 def should_inject_warning():
@@ -529,12 +575,21 @@ def multi_series_chart(df, field, title, y_title, palette):
         .properties(title=title, height=280)
     )
 
+# ---------------------------------------------------------
+# Branded header + status
+# ---------------------------------------------------------
+any_running = any(st.session_state.detector_running.values())
 
-# ---------------------------------------------------------
-# Branded header
-# ---------------------------------------------------------
+system_state = "ALERT" if st.session_state.warning_active else (
+    "ACTIVE" if any_running else "STANDBY"
+)
+
+system_state_icon = "⚠" if system_state == "ALERT" else (
+    "🟢" if system_state == "ACTIVE" else "⚪️"
+)
+
 st.markdown(
-    """
+    f"""
 <div class="app-header">
   <div class="app-header-left">
     <div class="app-eyebrow">Purdue University · Department of Food Science</div>
@@ -548,8 +603,9 @@ st.markdown(
     <div class="app-header-pill">
       <span></span><span>Real-time prototype</span>
     </div>
-    <div>Sampling interval: 1 s · virtual stream</div>
-    <div>Detectors online: 3 virtual nodes</div>
+    <div>{system_state_icon} System state: <strong>{system_state}</strong></div>
+    <div>Sampling interval: {sampling_interval_ms} ms · virtual stream</div>
+    <div>Detectors online: {sum(st.session_state.detector_running.values())} / {NUM_DETECTORS}</div>
   </div>
 </div>
 """,
@@ -557,19 +613,19 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
-# Controls and detector placement
+# Controls (per-detector) and detector image
 # ---------------------------------------------------------
 st.markdown(
     '<div class="section-header">Configuration</div>',
     unsafe_allow_html=True,
 )
 
-controls_col, image_col = st.columns([1.2, 1])
+controls_col, image_col = st.columns([1.4, 1])
 
 with controls_col:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown(
-        '<div class="card-heading">Detector control</div>',
+        '<div class="card-heading">Per-detector control</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -587,10 +643,8 @@ with controls_col:
             if st.button(
                 f"▶ Start {det_id}",
                 key=start_key,
-                type="primary",
             ):
                 st.session_state.detector_running[det_id] = True
-
                 if st.session_state.t0 is None:
                     st.session_state.t0 = pd.Timestamp.now()
 
@@ -624,13 +678,13 @@ with image_col:
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Auto-refresh
+# Auto-refresh (uses sidebar sampling interval)
 # ---------------------------------------------------------
 any_running = any(st.session_state.detector_running.values())
 
 if any_running:
     st_autorefresh(
-        interval=1000,
+        interval=sampling_interval_ms,
         limit=10**9,
         key="atmosphere_refresh",
     )
@@ -732,7 +786,7 @@ if st.session_state.warning_active and st.session_state.warning_messages:
     )
 
 # ---------------------------------------------------------
-# Current readings
+# Current readings (top band KPIs)
 # ---------------------------------------------------------
 st.markdown(
     '<div class="section-header">Current readings</div>',
@@ -746,9 +800,14 @@ if not st.session_state.data.empty:
         st.session_state.data["timestamp"] == latest_ts
     ]
 
-    det_cols = st.columns(NUM_DETECTORS)
+    # Filter by selected detectors from sidebar
+    latest_all = latest_all[
+        latest_all["detector_id"].isin(selected_detectors)
+    ]
 
-    for det_col, det_id in zip(det_cols, DETECTOR_IDS):
+    det_cols = st.columns(max(len(selected_detectors), 1))
+
+    for det_col, det_id in zip(det_cols, selected_detectors):
         det_latest = latest_all[latest_all["detector_id"] == det_id]
 
         if det_latest.empty:
@@ -806,7 +865,7 @@ else:
     st.info("All detectors are in STANDBY. Start any detector to begin the simulation.")
 
 # ---------------------------------------------------------
-# Live trends
+# Live trends (middle band)
 # ---------------------------------------------------------
 st.markdown(
     '<div class="section-header">Live trends</div>',
@@ -821,12 +880,23 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
         df_plot["timestamp"] - st.session_state.t0
     ).dt.total_seconds()
 
+    # Filter by selected detectors
+    df_plot = df_plot[df_plot["detector_id"].isin(selected_detectors)]
+
     # Neon palettes per detector
-    o2_colors = ["#22d3ee", "#a855f7", "#facc15"]
-    n2_colors = ["#22d3ee", "#a855f7", "#facc15"]
-    co2_colors = ["#22d3ee", "#a855f7", "#f97316"]
-    voc_colors = ["#22d3ee", "#a855f7", "#22c55e"]
-    rh_colors = ["#22d3ee", "#a855f7", "#38bdf8"]
+    base_palette = ["#22d3ee", "#a855f7", "#facc15"]
+    # map detectors to colors deterministically
+    color_map = {
+        det_id: base_palette[i % len(base_palette)]
+        for i, det_id in enumerate(selected_detectors)
+    }
+    palette = [color_map[det] for det in selected_detectors]
+
+    o2_colors = palette
+    n2_colors = palette
+    co2_colors = palette
+    voc_colors = palette
+    rh_colors = palette
 
     # Row 1: O₂ and N₂
     row1_col1, row1_col2 = st.columns(2)
@@ -874,7 +944,7 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
         )
         st.altair_chart(chart_voc, use_container_width=True, theme=None)
 
-    # Row 3: RH trend and data log
+    # Row 3: RH trend and data log (bottom band)
     row3_col1, row3_col2 = st.columns([2, 1])
 
     with row3_col1:
@@ -891,8 +961,13 @@ if not st.session_state.data.empty and st.session_state.t0 is not None:
         st.markdown('<div class="table-card">', unsafe_allow_html=True)
         st.markdown("**Data Log**")
 
+        # Filter log by selected detectors
+        log_df = st.session_state.data[
+            st.session_state.data["detector_id"].isin(selected_detectors)
+        ]
+
         st.dataframe(
-            st.session_state.data.tail(30).set_index(
+            log_df.tail(30).set_index(
                 ["timestamp", "detector_id"]
             ),
             use_container_width=True,
